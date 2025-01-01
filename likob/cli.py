@@ -8,11 +8,15 @@ class LikObShell(cmd.Cmd):
 
     def __init__(self):
         super().__init__()
-        self.db = SimpleDB()
+        try:
+            self.db = SimpleDB()
+        except Exception as e:
+            print(f"初始化数据库失败: {str(e)}")
+            self.db = None
 
     def do_exit(self, arg):
         """退出程序"""
-        print("Goodbye!")
+        print("\nGoodbye!")
         return True
 
     def do_quit(self, arg):
@@ -23,29 +27,30 @@ class LikObShell(cmd.Cmd):
         """处理SQL语句"""
         if not line.strip():
             return
-            
+
         try:
+            if not self.db:
+                self.db = SimpleDB()
+            
             result = self.db.execute(line)
             if result is not None:
-                if isinstance(result, list):
-                    self._print_result(result)
-                else:
-                    print(result)
+                self._print_result(result)
         except Exception as e:
-            print(f"错误: {str(e)}")
-            return False  # 继续运行，不退出
+            print(f"\n错误: {str(e)}")
+            # 不返回 True，这样就不会退出
+        return False
 
     def _print_result(self, result: List[Dict[str, Any]]) -> None:
         """格式化输出结果"""
         if not result:
-            print("Empty set")
+            print("\nEmpty set")
             return
         
         # 如果结果包含消息，直接打印
         if len(result) == 1 and 'message' in result[0]:
-            print(result[0]['message'])
+            print(f"\n{result[0]['message']}")
             return
-        
+
         # 获取列名
         columns = list(result[0].keys())
         
@@ -53,23 +58,55 @@ class LikObShell(cmd.Cmd):
         widths = {col: len(str(col)) for col in columns}
         for row in result:
             for col in columns:
-                widths[col] = max(widths[col], len(str(row[col])))
+                val = str(row[col])
+                # 考虑中文字符的宽度
+                width = sum(2 if ord(c) > 127 else 1 for c in val)
+                widths[col] = max(widths[col], width)
+
+        # 创建分隔线
+        separator = '+' + '+'.join('-' * (widths[col] + 2) for col in columns) + '+'
         
         # 打印表头
-        separator = '+' + '+'.join('-' * (widths[col] + 2) for col in columns) + '+'
-        print(separator)
-        print('| ' + ' | '.join(f"{col:{widths[col]}}" for col in columns) + ' |')
+        print('\n' + separator)
+        header = '|'
+        for col in columns:
+            header += f" {col:{widths[col]}} |"
+        print(header)
         print(separator)
         
         # 打印数据
         for row in result:
-            print('| ' + ' | '.join(f"{str(row[col]):{widths[col]}}" for col in columns) + ' |')
+            line = '|'
+            for col in columns:
+                val = str(row[col])
+                # 计算实际显示宽度
+                display_width = sum(2 if ord(c) > 127 else 1 for c in val)
+                padding = widths[col] - display_width
+                line += f" {val}{' ' * padding} |"
+            print(line)
+        
         print(separator)
-        print(f"\n{len(result)} rows in set")
+        print(f"\n{len(result)} {'row' if len(result) == 1 else 'rows'} in set\n")
 
     def emptyline(self):
         """处理空行"""
         pass
+
+    def do_help(self, arg):
+        """显示帮助信息"""
+        print("\nAvailable commands:")
+        print("  SELECT - 查询数据")
+        print("  INSERT - 插入数据")
+        print("  UPDATE - 更新数据")
+        print("  DELETE - 删除数据")
+        print("  CREATE - 创建表")
+        print("  exit/quit - 退出程序")
+        print("  help - 显示此帮助信息")
+        print("\nExample:")
+        print("  CREATE TABLE users (id INT, name TEXT);")
+        print("  INSERT INTO users VALUES (1, 'Alice');")
+        print("  SELECT * FROM users;")
+        print()
 
 def main():
     try:
@@ -77,7 +114,7 @@ def main():
     except KeyboardInterrupt:
         print("\nGoodbye!")
     except Exception as e:
-        print(f"Fatal error: {str(e)}")
+        print(f"\nFatal error: {str(e)}")
         print("Database shell terminated.")
 
 if __name__ == '__main__':
