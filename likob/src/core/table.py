@@ -1,52 +1,138 @@
-from typing import List, Dict, Any, Tuple, Set, Optional
-from .index import Index
+from typing import List, Dict, Any, Tuple, Optional, Union
+import operator
 
 class Table:
     def __init__(self, name: str, columns: List[Tuple[str, str]]):
         self.name = name
         self.columns = {}
         self.data = []
-        self.indexes = {}
-        self.primary_key = None
+        
         # 处理列定义
-        self._process_columns(columns)
-
-    def _process_columns(self, columns: List[Tuple[str, str]]) -> None:
-        """处理列定义和约束"""
         for col_name, col_type in columns:
-            # 检查是否是主键Y
-            if 'PRIMARY KEY' in col_type.upper():
-                if self.primary_key:
-                    raise Exception("表只能有一个主键")
-                self.primary_key = col_name
-                # 为主键创建唯一索引
-                self.indexes[col_name] = Index(self.name, col_name, is_unique=True)
-                # 移除 PRIMARY KEY 标记
-                col_type = col_type.upper().replace('PRIMARY KEY', '').strip()
-            
-            self.columns[col_name] = col_type
+            self.columns[col_name] = col_type.upper()
 
     def insert(self, values: List[Any]) -> None:
         """插入数据"""
-        # 获取列名列表
         column_names = list(self.columns.keys())
-        
-        # 检查值的数量是否匹配列的数量
         if len(values) != len(column_names):
             raise Exception(f"值的数量 ({len(values)}) 与列的数量 ({len(column_names)}) 不匹配")
         
-        # 创建数据字典
-        row_data = dict(zip(column_names, values))
+        # 类型转换和验证
+        row_data = {}
+        for col_name, value in zip(column_names, values):
+            col_type = self.columns[col_name]
+            try:
+                if col_type == 'INT':
+                    value = int(value)
+                elif col_type == 'FLOAT':
+                    value = float(value)
+                elif col_type == 'TEXT':
+                    value = str(value)
+            except ValueError:
+                raise Exception(f"列 {col_name} 的值 {value} 不能转换为 {col_type} 类型")
+            row_data[col_name] = value
         
-        # 添加数据
         self.data.append(row_data)
 
-    def select(self, columns: List[str] = None) -> List[Dict[str, Any]]:
+    def select(self, columns: Optional[List[str]] = None, conditions: Optional[Dict] = None,
+              order_by: Optional[List[Tuple[str, str]]] = None) -> List[Dict[str, Any]]:
         """查询数据"""
+        # 处理列选择
         if columns is None:
             columns = list(self.columns.keys())
         
-        result = []
-        for row in self.data:
-            result.append({col: row.get(col) for col in columns})
-        return result
+        # 验证列名
+        for col in columns:
+            if col not in self.columns:
+                raise Exception(f"未知的列名: {col}")
+        
+        # 筛选数据
+        result = self.data
+        if conditions:
+            result = self._filter_data(result, conditions)
+        
+        # 排序
+        if order_by:
+            for col, direction in reversed(order_by):
+                result = sorted(
+                    result,
+                    key=lambda x: x[col],
+                    reverse=(direction == 'DESC')
+                )
+        
+        # 投影列
+        return [{col: row[col] for col in columns} for row in result]
+
+    def update(self, updates: Dict[str, Any], conditions: Optional[Dict] = None) -> int:
+        """更新数据"""
+        # 验证列名
+        for col in updates:
+            if col not in self.columns:
+                raise Exception(f"未知的列名: {col}")
+        
+        # 找到匹配的行
+        if conditions:
+            rows = self._filter_data(self.data, conditions)
+        else:
+            rows = self.data
+        
+        # 更新数据
+        count = 0
+        for row in rows:
+            for col, value in updates.items():
+                row[col] = self._convert_value(value, self.columns[col])
+            count += 1
+        
+        return count
+
+    def delete(self, conditions: Optional[Dict] = None) -> int:
+        """删除数据"""
+        if conditions is None:
+            count = len(self.data)
+            self.data = []
+            return count
+        
+        original_length = len(self.data)
+        self.data = [row for row in self.data if not self._match_conditions(row, conditions)]
+        return original_length - len(self.data)
+
+    def _convert_value(self, value: Any, col_type: str) -> Any:
+        """转换值的类型"""
+        try:
+            if col_type == 'INT':
+                return int(value)
+            elif col_type == 'FLOAT':
+                return float(value)
+            elif col_type == 'TEXT':
+                return str(value)
+            return value
+        except ValueError:
+            raise Exception(f"值 {value} 不能转换为 {col_type} 类型")
+
+    def _match_conditions(self, row: Dict[str, Any], conditions: Dict) -> bool:
+        """检查行是否匹配条件"""
+        ops = {
+            '=': operator.eq,
+            '!=': operator.ne,
+            '>': operator.gt,
+            '>=': operator.ge,
+            '<': operator.lt,
+            '<=': operator.le
+        }
+        
+        for condition in conditions['conditions']:
+            col = condition['column']
+            op = condition['operator']
+            val = condition['value']
+            
+            if col not in row:
+                raise Exception(f"未知的列名: {col}")
+            
+            if not ops[op](row[col], val):
+                return False
+        
+        return True
+
+    def _filter_data(self, data: List[Dict[str, Any]], conditions: Dict) -> List[Dict[str, Any]]:
+        """根据条件筛选数据"""
+        return [row for row in data if self._match_conditions(row, conditions)]
