@@ -108,6 +108,30 @@ class LikObShell(cmd.Cmd):
         print("  SELECT * FROM users;")
         print()
 
+    def do_begin(self, arg):
+        """开始一个新事务"""
+        try:
+            self.db.begin_transaction()
+            print("事务已开始。")
+        except Exception as e:
+            print(f"错误: {str(e)}")
+
+    def do_commit(self, arg):
+        """提交当前事务"""
+        try:
+            self.db.commit_transaction()
+            print("事务已提交。")
+        except Exception as e:
+            print(f"错误: {str(e)}")
+
+    def do_rollback(self, arg):
+        """回滚当前事务"""
+        try:
+            self.db.rollback_transaction()
+            print("事务已回滚。")
+        except Exception as e:
+            print(f"错误: {str(e)}")
+
 def main():
     try:
         LikObShell().cmdloop()
