@@ -22,7 +22,10 @@ class QueryExecutor:
             return table.select(
                 columns=parsed_sql['columns'],
                 conditions=parsed_sql.get('where'),
-                order_by=parsed_sql.get('order_by')
+                group_by=parsed_sql.get('group_by'),
+                having=parsed_sql.get('having'),
+                order_by=parsed_sql.get('order_by'),
+                aggregates=parsed_sql.get('aggregates', [])
             )
         
         elif command == 'UPDATE':

@@ -72,76 +72,125 @@ class SQLParser:
             'values': values
         }
 
-    def _parse_conditions(self, where_clause: str) -> Dict[str, Any]:
-        """解析WHERE条件"""
+    def _parse_conditions(self, clause: str) -> Dict[str, Any]:
+        """解析条件子句"""
         conditions = {
-            'operator': 'AND',  # 默认操作符
+            'operator': 'AND',
             'conditions': []
         }
         
-        # 处理基本比较
-        comparisons = where_clause.split('AND')
-        for comp in comparisons:
-            comp = comp.strip()
-            for op in ['>=', '<=', '!=', '=', '>', '<']:
-                if op in comp:
-                    col, val = comp.split(op)
-                    val = val.strip()
-                    if val.startswith("'") and val.endswith("'"):
-                        val = val[1:-1]
-                    else:
-                        try:
-                            val = float(val) if '.' in val else int(val)
-                        except ValueError:
-                            pass
-                    conditions['conditions'].append({
-                        'column': col.strip(),
-                        'operator': op,
-                        'value': val
-                    })
-                    break
+        # 处理AND条件
+        for condition in clause.split('AND'):
+            condition = condition.strip()
+            # 检查聚合函数
+            agg_match = re.match(r'(COUNT|SUM|AVG|MAX|MIN)\((.*?)\)\s*(=|!=|>|>=|<|<=)\s*(.*)', condition)
+            if agg_match:
+                func, arg, op, val = agg_match.groups()
+                conditions['conditions'].append({
+                    'type': 'aggregate',
+                    'function': func.upper(),
+                    'argument': arg.strip(),
+                    'operator': op,
+                    'value': self._parse_value(val.strip())
+                })
+            else:
+                for op in ['>=', '<=', '!=', '=', '>', '<']:
+                    if op in condition:
+                        col, val = condition.split(op)
+                        conditions['conditions'].append({
+                            'type': 'simple',
+                            'column': col.strip(),
+                            'operator': op,
+                            'value': self._parse_value(val.strip())
+                        })
+                        break
         
         return conditions
 
+    def _parse_value(self, val: str) -> Any:
+        """解析值"""
+        if val.startswith("'") and val.endswith("'"):
+            return val[1:-1]
+        try:
+            return float(val) if '.' in val else int(val)
+        except ValueError:
+            return val
+
     def _parse_select(self, sql: str) -> Dict[str, Any]:
         """解析SELECT语句"""
-        # 基本结构
         result = {
             'command': 'SELECT',
             'columns': None,
             'table': None,
             'where': None,
             'group_by': None,
-            'order_by': None
+            'having': None,
+            'order_by': None,
+            'aggregates': []
         }
         
-        # 解析列名
+        # 解析列名和聚合函数
         columns_end = sql.upper().find('FROM')
         columns_str = sql[6:columns_end].strip()
+        
         if columns_str == '*':
             result['columns'] = None
         else:
-            result['columns'] = [col.strip() for col in columns_str.split(',')]
+            result['columns'] = []
+            for col in columns_str.split(','):
+                col = col.strip()
+                # 检查是否是聚合函数
+                agg_match = re.match(r'(COUNT|SUM|AVG|MAX|MIN)\((.*?)\)(?:\s+[aA][sS]\s+(\w+))?', col)
+                if agg_match:
+                    func, arg, alias = agg_match.groups()
+                    result['aggregates'].append({
+                        'function': func.upper(),
+                        'argument': arg.strip(),
+                        'alias': alias if alias else f"{func.lower()}_{arg.strip()}"
+                    })
+                else:
+                    result['columns'].append(col)
         
         # 解析表名
         sql = sql[columns_end + 4:].strip()
         table_end = sql.find(' ')
         if table_end == -1:
             result['table'] = sql
-        else:
-            result['table'] = sql[:table_end]
-            sql = sql[table_end:].strip()
+            return result
+        result['table'] = sql[:table_end]
+        sql = sql[table_end:].strip()
         
-        # 解析WHERE条件
+        # 解析WHERE
         where_idx = sql.upper().find('WHERE')
         if where_idx != -1:
-            where_end = sql.upper().find('GROUP BY')
-            if where_end == -1:
-                where_end = sql.upper().find('ORDER BY')
-            if where_end == -1:
-                where_end = len(sql)
+            group_idx = sql.upper().find('GROUP BY')
+            having_idx = sql.upper().find('HAVING')
+            order_idx = sql.upper().find('ORDER BY')
+            
+            where_end = min(x for x in [group_idx, having_idx, order_idx, len(sql)] if x != -1)
             where_clause = sql[where_idx + 5:where_end].strip()
             result['where'] = self._parse_conditions(where_clause)
+            sql = sql[where_end:].strip()
+        
+        # 解析GROUP BY
+        group_idx = sql.upper().find('GROUP BY')
+        if group_idx != -1:
+            having_idx = sql.upper().find('HAVING')
+            order_idx = sql.upper().find('ORDER BY')
+            
+            group_end = min(x for x in [having_idx, order_idx, len(sql)] if x != -1)
+            group_clause = sql[group_idx + 8:group_end].strip()
+            result['group_by'] = [col.strip() for col in group_clause.split(',')]
+            sql = sql[group_end:].strip()
+        
+        # 解析HAVING
+        having_idx = sql.upper().find('HAVING')
+        if having_idx != -1:
+            order_idx = sql.upper().find('ORDER BY')
+            having_end = order_idx if order_idx != -1 else len(sql)
+            having_clause = sql[having_idx + 6:having_end].strip()
+            result['having'] = self._parse_conditions(having_clause)
+            sql = sql[having_end:].strip()
         
         # 解析ORDER BY
         order_idx = sql.upper().find('ORDER BY')
