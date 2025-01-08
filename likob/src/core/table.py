@@ -1,12 +1,16 @@
 from typing import List, Dict, Any, Tuple, Optional, Union
 import operator
 from collections import defaultdict
+import threading
 
 class Table:
     def __init__(self, name: str, columns: List[Tuple[str, str]]):
         self.name = name
         self.columns = {}
         self.data = []
+        self.indexes: Dict[str, Union[BTreeIndex, HashIndex]] = {}
+        self.primary_key = None
+        self.lock = threading.Lock()  # 添加锁
         
         # 处理列定义
         for col_name, col_type in columns:
@@ -14,26 +18,30 @@ class Table:
 
     def insert(self, values: List[Any]) -> None:
         """插入数据"""
-        column_names = list(self.columns.keys())
-        if len(values) != len(column_names):
-            raise Exception(f"值的数量 ({len(values)}) 与列的数量 ({len(column_names)}) 不匹配")
-        
-        # 类型转换和验证
-        row_data = {}
-        for col_name, value in zip(column_names, values):
-            col_type = self.columns[col_name]
-            try:
-                if col_type == 'INT':
-                    value = int(value)
-                elif col_type == 'FLOAT':
-                    value = float(value)
-                elif col_type == 'TEXT':
-                    value = str(value)
-            except ValueError:
-                raise Exception(f"列 {col_name} 的值 {value} 不能转换为 {col_type} 类型")
-            row_data[col_name] = value
-        
-        self.data.append(row_data)
+        with self.lock:  # 使用锁
+            column_names = list(self.columns.keys())
+            if len(values) != len(column_names):
+                raise Exception(f"值的数量 ({len(values)}) 与列的数量 ({len(column_names)}) 不匹配")
+            
+            # 类型转换和验证
+            row_data = {}
+            for col_name, value in zip(column_names, values):
+                col_type = self.columns[col_name]
+                try:
+                    if col_type == 'INT':
+                        value = int(value)
+                    elif col_type == 'FLOAT':
+                        value = float(value)
+                    elif col_type == 'TEXT':
+                        value = str(value)
+                except ValueError:
+                    raise Exception(f"列 {col_name} 的值 {value} 不能转换为 {col_type} 类型")
+                row_data[col_name] = value
+            
+            self.data.append(row_data)
+            # 更新索引
+            for col, index in self.indexes.items():
+                index.insert(row_data[col], row_index)
 
     def select(self, columns: Optional[List[str]] = None, conditions: Optional[Dict] = None,
               group_by: Optional[List[str]] = None, having: Optional[Dict] = None,
