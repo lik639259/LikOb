@@ -1,8 +1,9 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from .table import Table
 from ..sql.parser import SQLParser
 from ..sql.executor import QueryExecutor
 import json
+from .transaction import Transaction
 
 class SimpleDB:
     def __init__(self):
@@ -11,10 +12,31 @@ class SimpleDB:
         self.executor = QueryExecutor(self)
         self.current_transaction: Transaction = None
 
-    def execute(self, sql: str) -> Optional[list]:
+    def begin_transaction(self):
+        """开始一个新事务"""
+        if self.current_transaction is not None:
+            raise Exception("已有活动事务，请先提交或回滚。")
+        self.current_transaction = Transaction()
+
+    def execute(self, sql: str) -> Optional[List[Dict[str, Any]]]:
         """执行SQL语句"""
         parsed = self.parser.parse(sql)
-        return self.executor.execute(parsed)
+        command = parsed['command']
+        
+        if command == 'BEGIN':
+            self.begin_transaction()
+            return [{'message': '事务已开始。'}]
+        elif command == 'SAVE':
+            self.save(parsed['filename'])
+            return [{'message': f"数据库已保存到 {parsed['filename']}。"}]
+        elif command == 'END':
+            return self.end_transaction()
+        elif command == 'LOAD':
+            self.load(parsed['filename'])
+            return [{'message': f"数据库已从 {parsed['filename']} 加载。"}]
+        else:
+            return self.executor.execute(parsed)
+        # 其他命令处理...
 
     def create_table(self, name: str, columns: list) -> None:
         """创建表"""
@@ -43,3 +65,11 @@ class SimpleDB:
                 table = self.tables[table_name]
                 for row in rows:
                     table.insert(row)
+
+    def end_transaction(self):
+        """结束当前事务"""
+        if self.current_transaction is None:
+            raise Exception("没有活动事务。")
+        self.current_transaction.commit()  # 提交事务
+        self.current_transaction = None
+        return [{'message': '事务已结束。'}]

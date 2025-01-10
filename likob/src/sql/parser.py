@@ -7,7 +7,21 @@ class SQLParser:
         # 移除末尾的分号和空白字符
         sql = sql.strip().rstrip(';').strip()
         
-        if sql.upper().startswith('CREATE TABLE'):
+        if sql.upper().startswith('BEGIN'):
+            return {'command': 'BEGIN'}
+        elif sql.upper().startswith('SAVE'):
+            match = re.match(r"SAVE\s+'(.+)'", sql, re.IGNORECASE)
+            if match:
+                return {'command': 'SAVE', 'filename': match.group(1)}
+            raise Exception("无效的SAVE语句")
+        elif sql.upper().startswith('END'):
+            return {'command': 'END'}
+        elif sql.upper().startswith('LOAD'):
+            match = re.match(r"LOAD\s+'(.+)'", sql, re.IGNORECASE)
+            if match:
+                return {'command': 'LOAD', 'filename': match.group(1)}
+            raise Exception("无效的LOAD语句")
+        elif sql.upper().startswith('CREATE TABLE'):
             return self._parse_create(sql)
         elif sql.upper().startswith('INSERT INTO'):
             return self._parse_insert(sql)
