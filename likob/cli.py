@@ -29,9 +29,6 @@ class LikObShell(cmd.Cmd):
             return
 
         try:
-            if not self.db:
-                self.db = SimpleDB()
-            
             result = self.db.execute(line)
             if result is not None:
                 self._print_result(result)
@@ -41,16 +38,11 @@ class LikObShell(cmd.Cmd):
         return False
 
     def _print_result(self, result: List[Dict[str, Any]]) -> None:
-        """格式化输出结果"""
+        """格式化输出结果为表格形式"""
         if not result:
             print("\nEmpty set")
             return
         
-        # 如果结果包含消息，直接打印
-        if len(result) == 1 and 'message' in result[0]:
-            print(f"\n{result[0]['message']}")
-            return
-
         # 获取列名
         columns = list(result[0].keys())
         
@@ -59,9 +51,7 @@ class LikObShell(cmd.Cmd):
         for row in result:
             for col in columns:
                 val = str(row[col])
-                # 考虑中文字符的宽度
-                width = sum(2 if ord(c) > 127 else 1 for c in val)
-                widths[col] = max(widths[col], width)
+                widths[col] = max(widths[col], len(val))
 
         # 创建分隔线
         separator = '+' + '+'.join('-' * (widths[col] + 2) for col in columns) + '+'
@@ -79,10 +69,7 @@ class LikObShell(cmd.Cmd):
             line = '|'
             for col in columns:
                 val = str(row[col])
-                # 计算实际显示宽度
-                display_width = sum(2 if ord(c) > 127 else 1 for c in val)
-                padding = widths[col] - display_width
-                line += f" {val}{' ' * padding} |"
+                line += f" {val:{widths[col]}} |"
             print(line)
         
         print(separator)

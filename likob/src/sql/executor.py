@@ -49,9 +49,18 @@ class QueryExecutor:
             count = table.delete(conditions=parsed_sql.get('where'))
             return [{'message': f"{count} rows deleted"}]
         
+        elif command == 'JOIN':
+            return self._execute_join(parsed_sql)
+        
         raise Exception(f"不支持的命令: {command}")
 
     def _add_to_transaction(self, operation: Dict[str, Any]):
         """将操作添加到当前事务"""
         if self.db.current_transaction is not None:
             self.db.current_transaction.add_operation(operation)
+
+    def _execute_join(self, parsed_sql: Dict[str, Any]) -> List[Dict[str, Any]]:
+        table1 = self.db.get_table(parsed_sql['table1'])
+        table2 = self.db.get_table(parsed_sql['table2'])
+        # 这里可以实现 JOIN 逻辑
+        # ...

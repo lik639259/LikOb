@@ -1,13 +1,12 @@
 from setuptools import setup, find_packages
 import io
 
-# 使用 UTF-8 编码读取 README
 with io.open("README.md", encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
     name="likob",
-    version="1.0.2",
+    version="1.0.3",
     packages=find_packages(),
     install_requires=[
         # 

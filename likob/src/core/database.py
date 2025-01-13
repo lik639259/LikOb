@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from .table import Table
 from ..sql.parser import SQLParser
 from ..sql.executor import QueryExecutor
@@ -38,11 +38,11 @@ class SimpleDB:
             return self.executor.execute(parsed)
         # 其他命令处理...
 
-    def create_table(self, name: str, columns: list) -> None:
-        """创建表"""
-        if name in self.tables:
-            raise Exception(f"表 {name} 已存在")
-        self.tables[name] = Table(name, columns)
+    def create_table(self, table_name: str, columns: List[Tuple[str, str]], indexes: Optional[List[str]] = None):
+        """创建新表"""
+        if table_name in self.tables:
+            raise Exception(f"表 {table_name} 已存在")
+        self.tables[table_name] = Table(table_name, columns, indexes)
 
     def get_table(self, name: str) -> Table:
         """获取表"""
