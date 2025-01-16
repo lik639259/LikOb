@@ -44,11 +44,11 @@ class SimpleDB:
             raise Exception(f"表 {table_name} 已存在")
         self.tables[table_name] = Table(table_name, columns, indexes)
 
-    def get_table(self, name: str) -> Table:
-        """获取表"""
-        if name not in self.tables:
-            raise Exception(f"表 {name} 不存在")
-        return self.tables[name]
+    def get_table(self, table_name: str) -> Table:
+        """获取表对象"""
+        if table_name not in self.tables:
+            raise Exception(f"表 {table_name} 不存在")
+        return self.tables[table_name]
 
     def save(self, filename: str):
         """保存数据库到文件"""

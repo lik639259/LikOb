@@ -9,28 +9,26 @@ class QueryExecutor:
         command = parsed_sql['command']
         
         if command == 'CREATE':
-            operation = {'command': 'CREATE', 'table': parsed_sql['table'], 'columns': parsed_sql['columns']}
-            self._add_to_transaction(operation)
             self.db.create_table(parsed_sql['table'], parsed_sql['columns'])
-            return [{'message': f"Table '{parsed_sql['table']}' created successfully"}]
+            return [{'message': f"表 '{parsed_sql['table']}' 创建成功。"}]
         
         elif command == 'INSERT':
-            operation = {'command': 'INSERT', 'table': parsed_sql['table'], 'values': parsed_sql['values']}
-            self._add_to_transaction(operation)
             table = self.db.get_table(parsed_sql['table'])
             table.insert(parsed_sql['values'])
-            return [{'message': '1 row inserted'}]
+            return [{'message': '1 行插入成功。'}]
         
         elif command == 'SELECT':
-            table = self.db.get_table(parsed_sql['table'])
-            return table.select(
-                columns=parsed_sql['columns'],
-                conditions=parsed_sql.get('where'),
-                group_by=parsed_sql.get('group_by'),
-                having=parsed_sql.get('having'),
-                order_by=parsed_sql.get('order_by'),
-                aggregates=parsed_sql.get('aggregates', [])
-            )
+            if 'join' in parsed_sql:
+                table1 = self.db.get_table(parsed_sql['table'])
+                table2 = self.db.get_table(parsed_sql['join']['table'])
+                on_column = parsed_sql['join']['on']
+                return table1.join(table2, on_column)
+            else:
+                table = self.db.get_table(parsed_sql['table'])
+                return table.select(
+                    columns=parsed_sql['columns'],
+                    conditions=parsed_sql.get('where')
+                )
         
         elif command == 'UPDATE':
             operation = {'command': 'UPDATE', 'table': parsed_sql['table'], 'updates': parsed_sql['updates'], 'where': parsed_sql.get('where')}

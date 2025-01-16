@@ -26,7 +26,23 @@ class SQLParser:
         elif sql.upper().startswith('INSERT INTO'):
             return self._parse_insert(sql)
         elif sql.upper().startswith('SELECT'):
-            return self._parse_select(sql)
+            match = re.match(r"SELECT\s+(.*?)\s+FROM\s+(\w+)(?:\s+JOIN\s+(\w+)\s+ON\s+(\w+))?", sql, re.IGNORECASE)
+            if match:
+                columns = match.group(1).split(',')
+                table = match.group(2)
+                join_table = match.group(3)
+                on_column = match.group(4)
+                parsed = {
+                    'command': 'SELECT',
+                    'columns': [col.strip() for col in columns],
+                    'table': table
+                }
+                if join_table:
+                    parsed['join'] = {
+                        'table': join_table,
+                        'on': on_column
+                    }
+                return parsed
         elif sql.upper().startswith('UPDATE'):
             return self._parse_update(sql)
         elif sql.upper().startswith('DELETE'):

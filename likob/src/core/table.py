@@ -256,3 +256,13 @@ class Table:
     def _filter_data(self, data: List[Dict[str, Any]], conditions: Dict) -> List[Dict[str, Any]]:
         """根据条件筛选数据"""
         return [row for row in data if self._match_conditions(row, conditions)]
+
+    def join(self, other: 'Table', on_column: str) -> List[Dict[str, Any]]:
+        """执行 INNER JOIN 操作"""
+        result = []
+        for row in self.data:
+            for other_row in other.data:
+                if row[on_column] == other_row[on_column]:
+                    combined_row = {**row, **other_row}
+                    result.append(combined_row)
+        return result
