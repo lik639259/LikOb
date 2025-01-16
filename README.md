@@ -4,11 +4,14 @@
 
 ## 功能特性
 
-- 基本的SQL语句支持（CREATE, SELECT, INSERT, DELETE）
-- 条件查询（WHERE）
-- 数据持久化
-- 表格化输出
+- 基本的 SQL 语句支持（CREATE, SELECT, INSERT, DELETE）
+- 复杂的 SQL 语句支持 （聚合函数, UNION，CASE...）
+- 基本查询（WHERE, LIMIT, DISTINCT, ORDER BY）
+- 连接支持（JOIN等各种子查询与连接）
+- 数据持久化 （支持数据库以json文件导入和导出）
 - 类型检查
+- 事务支持（BEGIN, COMMIT, ROLLBACK）
+- 索引支持以优化查询性能
 
 ## 安装
 ```bash
@@ -63,6 +66,14 @@ python main.py
 Welcome to LikOb Database Shell. Type help or ? to list commands.
 LikOb> 
 ````
+
+## 贡献
+
+欢迎任何形式的贡献！如果你有建议或发现了问题，请提交 issue 或者 pull request。
+
+## 许可证
+
+该项目使用 MIT 许可证，详细信息请查看 LICENSE 文件。
 
 ### 注意事项
 
