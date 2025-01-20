@@ -49,6 +49,14 @@ result = db.execute("SELECT * FROM users")
 print(result)
 ```
 
+支持导入和导出数据库（以json文件格式）：
+````
+db.import(yourDatabase.json)
+db.export(yourDatabase.json)
+
+````
+
+
 ### 启动shell程序
 
 如果你已经安装了likob
